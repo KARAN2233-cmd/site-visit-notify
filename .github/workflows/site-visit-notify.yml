@@ -1,15 +1,14 @@
 name: Site Visit Reminder
-
 on:
   schedule:
     # All times are UTC. India (IST) = UTC + 5:30
-    - cron: "0 16 * * *"   # 9:30 PM IST  = 16:00 UTC
-    - cron: "30 17 * * *"  # 11:00 PM IST = 17:30 UTC
-    - cron: "0 19 * * *"   # 12:30 AM IST = 19:00 UTC
-    - cron: "30 20 * * *"  # 2:00 AM IST  = 20:30 UTC
-    - cron: "0 22 * * *"   # 3:30 AM IST  = 22:00 UTC
-    - cron: "30 23 * * *"  # 5:00 AM IST  = 23:30 UTC
-    - cron: "0 1 * * *"    # 6:30 AM IST  = 01:00 UTC
+    - cron: "0 16 * * *"   # 9:30 PM IST
+    - cron: "30 17 * * *"  # 11:00 PM IST
+    - cron: "0 7 * * *"    # 12:30 PM IST
+    - cron: "30 8 * * *"   # 2:00 PM IST
+    - cron: "0 10 * * *"   # 3:30 PM IST
+    - cron: "30 11 * * *"  # 5:00 PM IST
+    - cron: "0 13 * * *"   # 6:30 PM IST
   workflow_dispatch:       # Allows manual trigger for testing
 
 jobs:
@@ -19,19 +18,33 @@ jobs:
       - name: Fetch device tokens from GAS
         id: get_tokens
         run: |
-          TOKENS=$(curl -s -X POST "${{ secrets.GAS_APPS_SCRIPT_URL }}" \
+          RESPONSE=$(curl -s -L -X POST "${{ secrets.GAS_APPS_SCRIPT_URL }}" \
             -H 'Content-Type: text/plain;charset=utf-8' \
             -d '{"action":"listTokens"}')
-          echo "TOKENS=$TOKENS" >> $GITHUB_OUTPUT
+
+          echo "Raw response from Apps Script:"
+          echo "$RESPONSE"
+
+          # Safety check: make sure it's actually JSON, not an HTML error/login page
+          if ! echo "$RESPONSE" | python3 -c "import sys, json; json.load(sys.stdin)" 2>/dev/null; then
+            echo "::error::Apps Script did not return valid JSON. It likely returned an HTML page (check that the Web App URL is deployed with 'Anyone' access, not restricted to a login)."
+            echo "tokens_json=[]" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          # Use a heredoc with a random delimiter so multi-line content can't break GITHUB_OUTPUT
+          {
+            echo "tokens_json<<TOKENS_EOF"
+            echo "$RESPONSE"
+            echo "TOKENS_EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Send FCM notification to all tokens
         run: |
-          TOKENS_JSON=${{ steps.get_tokens.outputs.TOKENS }}
-          # Parse tokens array and send to each
-          echo $TOKENS_JSON | python3 - << 'PYEOF'
-          import json, sys, urllib.request, urllib.parse
+          cat << 'PYEOF' > send_notify.py
+          import json, sys, os, urllib.request
 
-          raw = sys.stdin.read()
+          raw = os.environ["TOKENS_JSON"]
           data = json.loads(raw)
           tokens = data.get("tokens", [])
 
@@ -39,18 +52,15 @@ jobs:
               print("No tokens found, skipping")
               sys.exit(0)
 
-          SERVER_KEY = "${{ secrets.FIREBASE_SERVER_KEY }}"
+          SERVER_KEY = os.environ["FIREBASE_SERVER_KEY"]
 
           for token in tokens:
               payload = json.dumps({
                   "to": token,
                   "notification": {
                       "title": "Site Visit Reminder",
-                      "body": "Please fill the Site Visit form now!",
+                      "body": "Please Fill the Site Visit Form",
                       "icon": "/icon-192.png"
-                  },
-                  "data": {
-                      "url": "${{ secrets.GAS_APPS_SCRIPT_URL }}"
                   }
               }).encode("utf-8")
 
@@ -66,5 +76,9 @@ jobs:
                   with urllib.request.urlopen(req) as resp:
                       print(f"Sent to {token[:20]}...: {resp.read()}")
               except Exception as e:
-                  print(f"Failed for {token[:20]}...: {e}",
+                  print(f"Failed for {token[:20]}...: {e}")
           PYEOF
+          python3 send_notify.py
+        env:
+          TOKENS_JSON: ${{ steps.get_tokens.outputs.tokens_json }}
+          FIREBASE_SERVER_KEY: ${{ secrets.FIREBASE_SERVER_KEY }}
