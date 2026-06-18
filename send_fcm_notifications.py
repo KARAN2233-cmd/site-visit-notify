@@ -20,6 +20,7 @@ except ImportError:
 GAS_APPS_SCRIPT_URL = os.environ["GAS_APPS_SCRIPT_URL"]
 FIREBASE_PROJECT_ID = os.environ["FIREBASE_PROJECT_ID"]
 SERVICE_ACCOUNT_JSON = os.environ["FIREBASE_SERVICE_ACCOUNT_JSON"]
+SLOT_LABEL = os.environ.get("SLOT_LABEL", "").strip()
 
 SCOPES = ["https://www.googleapis.com/auth/firebase.messaging"]
 FCM_V1_URL = f"https://fcm.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/messages:send"
@@ -35,7 +36,7 @@ def get_access_token():
 def fetch_tokens():
     req = urllib.request.Request(
         GAS_APPS_SCRIPT_URL,
-        data=json.dumps({"action": "getTokens"}).encode("utf-8"),  # was "listTokens"
+        data=json.dumps({"action": "getTokens"}).encode("utf-8"),
         headers={"Content-Type": "text/plain;charset=utf-8"},
         method="POST",
     )
@@ -48,10 +49,7 @@ def send_notification(access_token, device_token, title, body_text):
     payload = {
         "message": {
             "token": device_token,
-            "notification": {
-                "title": title,
-                "body": body_text,
-            },
+            "notification": {"title": title, "body": body_text},
         }
     }
     req = urllib.request.Request(
@@ -70,8 +68,6 @@ def send_notification(access_token, device_token, title, body_text):
         print(f"  -> FAILED ({e.code}) for token {device_token[:12]}...: {e.read().decode('utf-8')}")
 
 
-SLOT_LABEL = os.environ.get("SLOT_LABEL", "").strip()
-
 def main():
     print("Fetching device tokens from Apps Script...")
     tokens = fetch_tokens()
@@ -83,15 +79,14 @@ def main():
     access_token = get_access_token()
 
     title = "🔔 Site Visit Reminder"
-    if SLOT_LABEL:
-        body_text = f"Time for site visit round — {SLOT_LABEL}. Please fill the form now."
-    else:
-        body_text = "Please complete today's site visit form."
+    body_text = (
+        f"Time for site visit round — {SLOT_LABEL}. Please fill the form now."
+        if SLOT_LABEL else
+        "Please complete today's site visit form."
+    )
 
     for t in tokens:
         send_notification(access_token, t, title, body_text)
-
-    print("Done.")
 
     print("Done.")
 
