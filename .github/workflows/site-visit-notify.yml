@@ -1,23 +1,38 @@
-- name: Fetch device tokens
-  id: get_tokens
-  run: |
-    echo "Calling Apps Script..."
+name: Site Visit Reminder
 
-    RESPONSE=$(curl -v --location \
-      --request POST \
-      "${{ secrets.GAS_APPS_SCRIPT_URL }}" \
-      --header "Content-Type: application/json" \
-      --data '{"action":"listTokens"}' 2>&1)
+on:
+  workflow_dispatch:
 
-    echo "================ RESPONSE ================"
-    printf '%s\n' "$RESPONSE"
-    echo "=========================================="
+jobs:
+  send-notification:
+    runs-on: ubuntu-latest
 
-    BODY=$(printf '%s\n' "$RESPONSE" | tail -n 1)
+    steps:
+      - name: Fetch device tokens
+        id: get_tokens
+        run: |
+          echo "Calling Apps Script..."
 
-    echo "BODY:"
-    printf '%s\n' "$BODY"
+          RESPONSE=$(curl -v --location \
+            --request POST \
+            "${{ secrets.GAS_APPS_SCRIPT_URL }}" \
+            --header "Content-Type: application/json" \
+            --data '{"action":"listTokens"}' 2>&1)
 
-    echo "tokens_json<<EOF" >> "$GITHUB_OUTPUT"
-    printf '%s\n' "$BODY" >> "$GITHUB_OUTPUT"
-    echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "================ RESPONSE ================"
+          printf '%s\n' "$RESPONSE"
+          echo "=========================================="
+
+          BODY=$(printf '%s\n' "$RESPONSE" | tail -n 1)
+
+          echo "BODY:"
+          printf '%s\n' "$BODY"
+
+          echo "tokens_json<<EOF" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$BODY" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Show Output
+        run: |
+          echo "Output from previous step:"
+          echo '${{ steps.get_tokens.outputs.tokens_json }}'
