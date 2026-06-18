@@ -70,6 +70,8 @@ def send_notification(access_token, device_token, title, body_text):
         print(f"  -> FAILED ({e.code}) for token {device_token[:12]}...: {e.read().decode('utf-8')}")
 
 
+SLOT_LABEL = os.environ.get("SLOT_LABEL", "").strip()
+
 def main():
     print("Fetching device tokens from Apps Script...")
     tokens = fetch_tokens()
@@ -80,11 +82,16 @@ def main():
     print(f"Found {len(tokens)} token(s). Getting access token...")
     access_token = get_access_token()
 
-    title = "Site Visit Reminder"
-    body_text = "Please complete today's site visit form."
+    title = "🔔 Site Visit Reminder"
+    if SLOT_LABEL:
+        body_text = f"Time for site visit round — {SLOT_LABEL}. Please fill the form now."
+    else:
+        body_text = "Please complete today's site visit form."
 
     for t in tokens:
         send_notification(access_token, t, title, body_text)
+
+    print("Done.")
 
     print("Done.")
 
