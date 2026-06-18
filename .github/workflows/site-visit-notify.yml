@@ -1,16 +1,6 @@
 name: Site Visit Reminder
 
 on:
-  schedule:
-    # UTC times (IST = UTC + 5:30)
-    - cron: "0 16 * * *"
-    - cron: "30 17 * * *"
-    - cron: "0 7 * * *"
-    - cron: "30 8 * * *"
-    - cron: "0 10 * * *"
-    - cron: "30 11 * * *"
-    - cron: "0 13 * * *"
-
   workflow_dispatch:
 
 jobs:
@@ -20,7 +10,6 @@ jobs:
     steps:
       - name: Fetch device tokens
         id: get_tokens
-        shell: bash
         run: |
           RESPONSE=$(curl --silent --show-error --location \
             --request POST \
@@ -28,77 +17,15 @@ jobs:
             --header "Content-Type: application/json" \
             --data '{"action":"listTokens"}')
 
-          echo "Apps Script Response:"
+          echo "Response:"
           echo "$RESPONSE"
 
-          python3 - <<EOF
-import json
-import sys
+          echo "tokens_json<<EOF" >> $GITHUB_OUTPUT
+          echo "$RESPONSE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-try:
-    obj=json.loads('''$RESPONSE''')
-    print("JSON OK")
-except Exception as e:
-    print("Invalid JSON")
-    print(e)
-    sys.exit(1)
-EOF
-
-          {
-            echo "tokens_json<<EOF"
-            echo "$RESPONSE"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Send Notifications
-        shell: bash
-        env:
-          TOKENS_JSON: ${{ steps.get_tokens.outputs.tokens_json }}
-          FIREBASE_SERVER_KEY: ${{ secrets.FIREBASE_SERVER_KEY }}
+      - name: Validate JSON
         run: |
-
-          cat > send.py << 'PY'
-import json
-import os
-import urllib.request
-
-data=json.loads(os.environ["TOKENS_JSON"])
-
-tokens=data.get("tokens",[])
-
-print("Tokens:",len(tokens))
-
-if not tokens:
-    print("No tokens found")
-    exit(0)
-
-SERVER_KEY=os.environ["FIREBASE_SERVER_KEY"]
-
-for token in tokens:
-
-    payload=json.dumps({
-        "to":token,
-        "notification":{
-            "title":"Site Visit Reminder",
-            "body":"Please Fill the Site Visit Form",
-            "icon":"/icon-192.png"
-        }
-    }).encode()
-
-    req=urllib.request.Request(
-        "https://fcm.googleapis.com/fcm/send",
-        data=payload,
-        headers={
-            "Authorization":"key="+SERVER_KEY,
-            "Content-Type":"application/json"
-        }
-    )
-
-    try:
-        with urllib.request.urlopen(req) as r:
-            print(r.read().decode())
-    except Exception as e:
-        print(e)
-PY
-
-          python3 send.py
+          python3 -c "import json,os; json.loads(os.environ['TOKENS'])"
+        env:
+          TOKENS: ${{ steps.get_tokens.outputs.tokens_json }}
