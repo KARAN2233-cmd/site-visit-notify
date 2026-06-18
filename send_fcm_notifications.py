@@ -35,7 +35,7 @@ def get_access_token():
 def fetch_tokens():
     req = urllib.request.Request(
         GAS_APPS_SCRIPT_URL,
-        data=json.dumps({"action": "listTokens"}).encode("utf-8"),
+        data=json.dumps({"action": "getTokens"}).encode("utf-8"),  # was "listTokens"
         headers={"Content-Type": "text/plain;charset=utf-8"},
         method="POST",
     )
