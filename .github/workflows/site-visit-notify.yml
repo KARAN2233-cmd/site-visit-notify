@@ -1,32 +1,18 @@
 name: Site Visit Reminder
 
 on:
-
   schedule:
-
     - cron: '0 7 * * *'
-    - cron: '30 8 * * *'
-    - cron: '0 10 * * *'
-    - cron: '30 11 * * *'
-    - cron: '0 13 * * *'
-    - cron: '0 16 * * *'
-    - cron: '30 17 * * *'
-
   workflow_dispatch:
 
 jobs:
-
   notify:
-
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
 
-      - uses: actions/checkout@v4
-
-      - name: Send Notification
-
+      - name: Send Reminder
         run: |
-
-          curl -X POST \
-          "${{ secrets.NOTIFY_ENDPOINT }}"
+          curl -X POST "${{ secrets.NOTIFY_ENDPOINT }}"
