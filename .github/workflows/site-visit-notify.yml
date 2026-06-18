@@ -1,38 +1,32 @@
 name: Site Visit Reminder
 
 on:
+
+  schedule:
+
+    - cron: '0 7 * * *'
+    - cron: '30 8 * * *'
+    - cron: '0 10 * * *'
+    - cron: '30 11 * * *'
+    - cron: '0 13 * * *'
+    - cron: '0 16 * * *'
+    - cron: '30 17 * * *'
+
   workflow_dispatch:
 
 jobs:
-  send-notification:
+
+  notify:
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Fetch device tokens
-        id: get_tokens
+
+      - uses: actions/checkout@v4
+
+      - name: Send Notification
+
         run: |
-          echo "Calling Apps Script..."
 
-          RESPONSE=$(curl -v --location \
-            --request POST \
-            "${{ secrets.GAS_APPS_SCRIPT_URL }}" \
-            --header "Content-Type: application/json" \
-            --data '{"action":"listTokens"}' 2>&1)
-
-          echo "================ RESPONSE ================"
-          printf '%s\n' "$RESPONSE"
-          echo "=========================================="
-
-          BODY=$(printf '%s\n' "$RESPONSE" | tail -n 1)
-
-          echo "BODY:"
-          printf '%s\n' "$BODY"
-
-          echo "tokens_json<<EOF" >> "$GITHUB_OUTPUT"
-          printf '%s\n' "$BODY" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: Show Output
-        run: |
-          echo "Output from previous step:"
-          echo '${{ steps.get_tokens.outputs.tokens_json }}'
+          curl -X POST \
+          "${{ secrets.NOTIFY_ENDPOINT }}"
