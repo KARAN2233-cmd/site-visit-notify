@@ -1,84 +1,28 @@
-name: Site Visit Reminder
-on:
-  schedule:
-    # All times are UTC. India (IST) = UTC + 5:30
-    - cron: "0 16 * * *"   # 9:30 PM IST
-    - cron: "30 17 * * *"  # 11:00 PM IST
-    - cron: "0 7 * * *"    # 12:30 PM IST
-    - cron: "30 8 * * *"   # 2:00 PM IST
-    - cron: "0 10 * * *"   # 3:30 PM IST
-    - cron: "30 11 * * *"  # 5:00 PM IST
-    - cron: "0 13 * * *"   # 6:30 PM IST
-  workflow_dispatch:       # Allows manual trigger for testing
+- name: Fetch device tokens from GAS
+  id: get_tokens
+  run: |
+    RESPONSE=$(curl -i -L -X POST "${{ secrets.GAS_APPS_SCRIPT_URL }}" \
+      -H "Content-Type: application/json" \
+      -d '{"action":"listTokens"}')
 
-jobs:
-  send-notification:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Fetch device tokens from GAS
-        id: get_tokens
-        run: |
-          RESPONSE=$(curl -s -L -X POST "${{ secrets.GAS_APPS_SCRIPT_URL }}" \
-            -H 'Content-Type: text/plain;charset=utf-8' \
-            -d '{"action":"listTokens"}')
+    echo "===== FULL RESPONSE ====="
+    echo "$RESPONSE"
+    echo "========================="
 
-          echo "Raw response from Apps Script:"
-          echo "$RESPONSE"
+    # Extract JSON body (remove HTTP headers)
+    BODY=$(echo "$RESPONSE" | sed -n '/^\r$/,$p' | tail -n +2)
 
-          # Safety check: make sure it's actually JSON, not an HTML error/login page
-          if ! echo "$RESPONSE" | python3 -c "import sys, json; json.load(sys.stdin)" 2>/dev/null; then
-            echo "::error::Apps Script did not return valid JSON. It likely returned an HTML page (check that the Web App URL is deployed with 'Anyone' access, not restricted to a login)."
-            echo "tokens_json=[]" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
+    echo "===== JSON BODY ====="
+    echo "$BODY"
+    echo "====================="
 
-          # Use a heredoc with a random delimiter so multi-line content can't break GITHUB_OUTPUT
-          {
-            echo "tokens_json<<TOKENS_EOF"
-            echo "$RESPONSE"
-            echo "TOKENS_EOF"
-          } >> "$GITHUB_OUTPUT"
+    if ! echo "$BODY" | python3 -c "import sys, json; json.load(sys.stdin)" 2>/dev/null; then
+      echo "::error::Apps Script did not return valid JSON."
+      exit 1
+    fi
 
-      - name: Send FCM notification to all tokens
-        run: |
-          cat << 'PYEOF' > send_notify.py
-          import json, sys, os, urllib.request
-
-          raw = os.environ["TOKENS_JSON"]
-          data = json.loads(raw)
-          tokens = data.get("tokens", [])
-
-          if not tokens:
-              print("No tokens found, skipping")
-              sys.exit(0)
-
-          SERVER_KEY = os.environ["FIREBASE_SERVER_KEY"]
-
-          for token in tokens:
-              payload = json.dumps({
-                  "to": token,
-                  "notification": {
-                      "title": "Site Visit Reminder",
-                      "body": "Please Fill the Site Visit Form",
-                      "icon": "/icon-192.png"
-                  }
-              }).encode("utf-8")
-
-              req = urllib.request.Request(
-                  "https://fcm.googleapis.com/fcm/send",
-                  data=payload,
-                  headers={
-                      "Authorization": "key=" + SERVER_KEY,
-                      "Content-Type": "application/json"
-                  }
-              )
-              try:
-                  with urllib.request.urlopen(req) as resp:
-                      print(f"Sent to {token[:20]}...: {resp.read()}")
-              except Exception as e:
-                  print(f"Failed for {token[:20]}...: {e}")
-          PYEOF
-          python3 send_notify.py
-        env:
-          TOKENS_JSON: ${{ steps.get_tokens.outputs.tokens_json }}
-          FIREBASE_SERVER_KEY: ${{ secrets.FIREBASE_SERVER_KEY }}
+    {
+      echo "tokens_json<<EOF"
+      echo "$BODY"
+      echo "EOF"
+    } >> "$GITHUB_OUTPUT"
