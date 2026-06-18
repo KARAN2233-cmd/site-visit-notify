@@ -1,31 +1,23 @@
-name: Site Visit Reminder
+- name: Fetch device tokens
+  id: get_tokens
+  run: |
+    echo "Calling Apps Script..."
 
-on:
-  workflow_dispatch:
+    RESPONSE=$(curl -v --location \
+      --request POST \
+      "${{ secrets.GAS_APPS_SCRIPT_URL }}" \
+      --header "Content-Type: application/json" \
+      --data '{"action":"listTokens"}' 2>&1)
 
-jobs:
-  send-notification:
-    runs-on: ubuntu-latest
+    echo "================ RESPONSE ================"
+    printf '%s\n' "$RESPONSE"
+    echo "=========================================="
 
-    steps:
-      - name: Fetch device tokens
-        id: get_tokens
-        run: |
-          RESPONSE=$(curl --silent --show-error --location \
-            --request POST \
-            "${{ secrets.GAS_APPS_SCRIPT_URL }}" \
-            --header "Content-Type: application/json" \
-            --data '{"action":"listTokens"}')
+    BODY=$(printf '%s\n' "$RESPONSE" | tail -n 1)
 
-          echo "Response:"
-          echo "$RESPONSE"
+    echo "BODY:"
+    printf '%s\n' "$BODY"
 
-          echo "tokens_json<<EOF" >> $GITHUB_OUTPUT
-          echo "$RESPONSE" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Validate JSON
-        run: |
-          python3 -c "import json,os; json.loads(os.environ['TOKENS'])"
-        env:
-          TOKENS: ${{ steps.get_tokens.outputs.tokens_json }}
+    echo "tokens_json<<EOF" >> "$GITHUB_OUTPUT"
+    printf '%s\n' "$BODY" >> "$GITHUB_OUTPUT"
+    echo "EOF" >> "$GITHUB_OUTPUT"
