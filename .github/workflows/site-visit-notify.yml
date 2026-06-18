@@ -1,0 +1,70 @@
+name: Site Visit Reminder
+
+on:
+  schedule:
+    # All times are UTC. India (IST) = UTC + 5:30
+    - cron: "0 16 * * *"   # 9:30 PM IST  = 16:00 UTC
+    - cron: "30 17 * * *"  # 11:00 PM IST = 17:30 UTC
+    - cron: "0 19 * * *"   # 12:30 AM IST = 19:00 UTC
+    - cron: "30 20 * * *"  # 2:00 AM IST  = 20:30 UTC
+    - cron: "0 22 * * *"   # 3:30 AM IST  = 22:00 UTC
+    - cron: "30 23 * * *"  # 5:00 AM IST  = 23:30 UTC
+    - cron: "0 1 * * *"    # 6:30 AM IST  = 01:00 UTC
+  workflow_dispatch:       # Allows manual trigger for testing
+
+jobs:
+  send-notification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch device tokens from GAS
+        id: get_tokens
+        run: |
+          TOKENS=$(curl -s -X POST "${{ secrets.GAS_APPS_SCRIPT_URL }}" \
+            -H 'Content-Type: text/plain;charset=utf-8' \
+            -d '{"action":"listTokens"}')
+          echo "TOKENS=$TOKENS" >> $GITHUB_OUTPUT
+
+      - name: Send FCM notification to all tokens
+        run: |
+          TOKENS_JSON=${{ steps.get_tokens.outputs.TOKENS }}
+          # Parse tokens array and send to each
+          echo $TOKENS_JSON | python3 - << 'PYEOF'
+          import json, sys, urllib.request, urllib.parse
+
+          raw = sys.stdin.read()
+          data = json.loads(raw)
+          tokens = data.get("tokens", [])
+
+          if not tokens:
+              print("No tokens found, skipping")
+              sys.exit(0)
+
+          SERVER_KEY = "${{ secrets.FIREBASE_SERVER_KEY }}"
+
+          for token in tokens:
+              payload = json.dumps({
+                  "to": token,
+                  "notification": {
+                      "title": "Site Visit Reminder",
+                      "body": "Please fill the Site Visit form now!",
+                      "icon": "/icon-192.png"
+                  },
+                  "data": {
+                      "url": "${{ secrets.GAS_APPS_SCRIPT_URL }}"
+                  }
+              }).encode("utf-8")
+
+              req = urllib.request.Request(
+                  "https://fcm.googleapis.com/fcm/send",
+                  data=payload,
+                  headers={
+                      "Authorization": "key=" + SERVER_KEY,
+                      "Content-Type": "application/json"
+                  }
+              )
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      print(f"Sent to {token[:20]}...: {resp.read()}")
+              except Exception as e:
+                  print(f"Failed for {token[:20]}...: {e}",
+          PYEOF
