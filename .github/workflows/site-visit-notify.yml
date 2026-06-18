@@ -1,28 +1,19 @@
-- name: Fetch device tokens from GAS
+- name: Fetch device tokens
   id: get_tokens
   run: |
-    RESPONSE=$(curl -i -L -X POST "${{ secrets.GAS_APPS_SCRIPT_URL }}" \
-      -H "Content-Type: application/json" \
-      -d '{"action":"listTokens"}')
+    RESPONSE=$(curl --location \
+      --request POST \
+      "${{ secrets.GAS_APPS_SCRIPT_URL }}" \
+      --header "Content-Type: application/json" \
+      --data '{"action":"listTokens"}')
 
-    echo "===== FULL RESPONSE ====="
+    echo "Response:"
     echo "$RESPONSE"
-    echo "========================="
 
-    # Extract JSON body (remove HTTP headers)
-    BODY=$(echo "$RESPONSE" | sed -n '/^\r$/,$p' | tail -n +2)
-
-    echo "===== JSON BODY ====="
-    echo "$BODY"
-    echo "====================="
-
-    if ! echo "$BODY" | python3 -c "import sys, json; json.load(sys.stdin)" 2>/dev/null; then
-      echo "::error::Apps Script did not return valid JSON."
-      exit 1
-    fi
+    python3 -c "import json,sys;print(json.loads(sys.stdin.read()))" <<< "$RESPONSE"
 
     {
       echo "tokens_json<<EOF"
-      echo "$BODY"
+      echo "$RESPONSE"
       echo "EOF"
     } >> "$GITHUB_OUTPUT"
