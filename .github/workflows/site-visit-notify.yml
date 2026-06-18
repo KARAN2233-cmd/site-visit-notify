@@ -2,7 +2,13 @@ name: Site Visit Reminder
 
 on:
   schedule:
-    - cron: '0 7 * * *'
+    - cron: '30 15 * * *'   # 9:00 PM IST
+    - cron: '30 17 * * *'   # 11:00 PM IST
+    - cron: '0 19 * * *'    # 12:30 AM IST
+    - cron: '30 20 * * *'   # 2:00 AM IST
+    - cron: '0 22 * * *'    # 3:30 AM IST
+    - cron: '30 23 * * *'   # 5:00 AM IST
+    - cron: '0 1 * * *'     # 6:30 AM IST
   workflow_dispatch:
 
 jobs:
@@ -13,6 +19,32 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v5
 
-      - name: Send Reminder
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install google-auth
+
+      - name: Determine slot label
+        id: slot
         run: |
-          curl -X POST "${{ secrets.NOTIFY_ENDPOINT }}"
+          case "${{ github.event.schedule }}" in
+            "30 15 * * *") echo "label=9:00 PM" >> "$GITHUB_OUTPUT" ;;
+            "30 17 * * *") echo "label=11:00 PM" >> "$GITHUB_OUTPUT" ;;
+            "0 19 * * *")  echo "label=12:30 AM" >> "$GITHUB_OUTPUT" ;;
+            "30 20 * * *") echo "label=2:00 AM" >> "$GITHUB_OUTPUT" ;;
+            "0 22 * * *")  echo "label=3:30 AM" >> "$GITHUB_OUTPUT" ;;
+            "30 23 * * *") echo "label=5:00 AM" >> "$GITHUB_OUTPUT" ;;
+            "0 1 * * *")   echo "label=6:30 AM" >> "$GITHUB_OUTPUT" ;;
+            *) echo "label=Manual Test" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Send Reminder
+        env:
+          GAS_APPS_SCRIPT_URL: ${{ secrets.GAS_APPS_SCRIPT_URL }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          SLOT_LABEL: ${{ steps.slot.outputs.label }}
+        run: python send_fcm_notifications.py
