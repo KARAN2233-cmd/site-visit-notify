@@ -2,7 +2,7 @@ name: Site Visit Reminder
 
 on:
   schedule:
-    - cron: '30 15 * * *'   # 9:00 PM IST
+    - cron: '0 16 * * *'    # 9:30 PM IST
     - cron: '30 17 * * *'   # 11:00 PM IST
     - cron: '0 19 * * *'    # 12:30 AM IST
     - cron: '30 20 * * *'   # 2:00 AM IST
@@ -20,7 +20,7 @@ jobs:
         id: slot
         run: |
           case "${{ github.event.schedule }}" in
-            "30 15 * * *") echo "label=9:00 PM" >> "$GITHUB_OUTPUT" ;;
+            "0 16 * * *")  echo "label=9:30 PM" >> "$GITHUB_OUTPUT" ;;
             "30 17 * * *") echo "label=11:00 PM" >> "$GITHUB_OUTPUT" ;;
             "0 19 * * *")  echo "label=12:30 AM" >> "$GITHUB_OUTPUT" ;;
             "30 20 * * *") echo "label=2:00 AM" >> "$GITHUB_OUTPUT" ;;
